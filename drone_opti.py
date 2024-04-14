@@ -7,20 +7,14 @@ from aerosandbox.library import airfoils
 #Fluid properties
 density = 1.225
 viscosity = 1.81e-5
+xyz_ref = [0,0,0]
 
-af = asb.Airfoil(name="naca0012").add_control_surface(
-    deflection=30.0,
-    hinge_point_x=0.7
-)
-
-
-Aileron = asb.geometry.wing.ControlSurface(
-    name="Aileron",
-    symmetric = False,
-    deflection = 30,
-    hinge_point = 0.7,
     
-)
+    
+op_point = asb.OperatingPoint(
+    atmosphere=asb.Atmosphere(altitude=0),
+    velocity=91.3,  # m/s
+    )
 
 
 airplane = asb.Airplane(
@@ -29,6 +23,8 @@ airplane = asb.Airplane(
     s_ref = 9, #Reference area
     c_ref = 0.9, #Reference chord
     b_ref = 10, #Reference span
+    
+
 
     wings=[
         asb.Wing(
@@ -48,7 +44,7 @@ airplane = asb.Airplane(
                     chord = 0.13,
                     twist = -2,
                     airfoil=asb.Airfoil("s1223"),
-                    control_surface=[Aileron],
+                    
                     
                     
                 ),
@@ -140,21 +136,72 @@ airplane = asb.Airplane(
     ]
 )
 
-vlm = asb.VortexLatticeMethod(
-    airplane=airplane,
-    op_point=asb.OperatingPoint(
-        velocity=25,  # m/s
-        alpha=0,  # degree
-    )
-)
+## Aero builduup
 
-aero = vlm.run()  # Returns a dictionary
-for k, v in aero.items():
-    print(f"{k.rjust(4)} : {v}")
+# ab_op_point = op_point.copy()
+# ab_op_point.alpha = np.linspace(-12, 12, 50)
 
-    # NBVAL_SKIP
+# aerobuildup_aero = asb.AeroBuildup(
+#     airplane=airplane,
+#     op_point=ab_op_point,
+#     xyz_ref=xyz_ref
+# ).run()
+# aerobuildup_aero["alpha"] = ab_op_point.alpha
 
-vlm.draw(show_kwargs=dict(jupyter_backend="static"))
+# print(aerobuildup_aero)
 
-if __name__ == '__main__':
-    airplane.draw_three_view()
+## Nonlinear lifting Line 
+
+nlll_op_point = op_point.copy()
+nlll_op_point.alpha = np.linspace(-10, 10, 11)
+
+nlll_aeros = [
+    asb.NonlinearLiftingLine(
+        airplane=airplane,
+        op_point=op,
+        xyz_ref=xyz_ref,
+    ).run()
+    for op in nlll_op_point
+]
+
+nlll_aero = {}
+for k in nlll_aeros[0].keys():
+    nlll_aero[k] = np.array([
+        aero[k]
+        for aero in nlll_aeros
+    ])
+nlll_aero["alpha"] = nlll_op_point.alpha
+
+print(nlll_aero)
+
+## Quasi Lifting line
+ll_op_point = op_point.copy()
+ll_op_point.alpha = np.linspace(-12, 14, 31)
+
+ll_aeros = [
+    asb.LiftingLine(
+        airplane=airplane,
+        op_point=op,
+        xyz_ref=xyz_ref,
+    ).run()
+    for op in ll_op_point
+]
+
+ll_aero = {}
+for k in ll_aeros[0].keys():
+    ll_aero[k] = np.array([
+        aero[k]
+        for aero in ll_aeros
+    ])
+ll_aero["alpha"] = ll_op_point.alpha
+
+print(ll_aero)
+
+
+
+### VLM
+
+# vlm.draw(show_kwargs=dict(jupyter_backend="static"))
+
+# if __name__ == '__main__':
+#     airplane.draw_three_view()
