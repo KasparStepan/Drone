@@ -153,7 +153,7 @@ airplane = asb.Airplane(
 ## Nonlinear lifting Line 
 
 nlll_op_point = op_point.copy()
-nlll_op_point.alpha = np.linspace(-10, 10, 11)
+nlll_op_point.alpha = np.linspace(-10, 10, 5)
 
 nlll_aeros = [
     asb.NonlinearLiftingLine(
@@ -176,7 +176,7 @@ print(nlll_aero)
 
 ## Quasi Lifting line
 ll_op_point = op_point.copy()
-ll_op_point.alpha = np.linspace(-12, 14, 31)
+ll_op_point.alpha = np.linspace(0, 14, 4)
 
 ll_aeros = [
     asb.LiftingLine(
