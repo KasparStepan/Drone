@@ -3,14 +3,89 @@ import aerosandbox.numpy as np
 from aerosandbox.library import airfoils
 import copy
 
-# Enviroment Values
+### Enviroment Constants
 g = 9.80665
 
+### Flight conditions
+altitude_flight = 0
+atmosphere = asb.Atmosphere(altitude=altitude_flight)
+freestream_velocity = 25
+# alpha = 4
+density  = atmosphere.density()
+viscosity = atmosphere.dynamic_viscosity()
+pressure = atmosphere.pressure()
+
+### Optimization variables
+
+opti = asb.Opti()
+
+method_type = {
+       "VLM": False,
+       "Lifting line": True,
+       "AeroBuildup": False,
+       "AVL": False,
+}
+
+alpha = opti.variable(init_guess=4,lower_bound = 0, upper_bound = 6)
+twist_root = opti.variable(init_guess=2)
 
 
-opti = asb.Opti(
-    freeze_style = 'float'
-)
+
+## Wing parameters
+
+max_taper = 0.7
+
+chord = { #m
+      "Wing root": opti.variable(init_guess = 0.15,lower_bound = 0.1),
+      "Wing mid": opti.variable(init_guess = 0.13,lower_bound = 0.1),
+      "Wing tip" : opti.variable(init_guess = 0.05,lower_bound = 0.03),
+      "Wing tail root": 0.1,
+      "Wing tail tip":0.06,
+}
+
+opti.subject_to([
+       chord["Wing root"]>chord["Wing mid"],
+       chord["Wing mid"]>chord["Wing tip"],
+       chord["Wing tail root"]>chord["Wing tail tip"],
+       (chord["Wing mid"]/chord["Wing root"])>max_taper,
+       (chord["Wing tip"]/chord["Wing mid"])>max_taper
+])
+
+wing_span = { #m
+      "Wing center": opti.variable(init_guess = 0.4,lower_bound = 0.1),
+      "Wing tip" : opti.variable(init_guess = 0.2,lower_bound = 0.1),
+      "Wing tail": 0.15,
+}
+
+opti.subject_to([
+      wing_span["Wing center"]+wing_span["Wing tip"]<=0.75,
+      wing_span["Wing center"]+wing_span["Wing tip"]>=0.3
+])
+
+sweep_angle = { #deg
+      "Wing center": 0,
+      "Wing tip" : 0,
+      "Wing tail": 10,    
+}
+
+dihedral_angle = { #deg
+      "Wing center": 0,
+      "Wing tip": 10,
+      "Wing tail": 45
+}
+
+twist = { #deg
+      "Wing root": 0,
+      "Wing mid": 0,
+      "Wing tip" : 0,
+      "Wing tail root": 0,
+      "Wing tail tip":0,
+}
+
+tail_length = 6
+body_length = 2
+
+
 
 infill_default = 0.2
 skin_thickness_default = 0.0015
@@ -44,16 +119,7 @@ infill = {
 }
 
 
-    
-    
-op_point = asb.OperatingPoint(
-    atmosphere=asb.Atmosphere(altitude=0),
-    velocity=25,  # m/s
-    )
-
-
 airfoil_main_wing = asb.Airfoil("rg15")
-
 
 ## Definition of Main wing
 Center_wing = asb.Wing(
@@ -62,15 +128,15 @@ Center_wing = asb.Wing(
             symmetric=True,
             xsecs=[# The wing's cross ("X") sections, or "XSecs"
                 asb.WingXSec(#Root
-                    xyz_le = [0.1,0,0],
-                    chord = 0.15, #meters
-                    twist = 0, #degrees
+                    xyz_le = [0,0,0],
+                    chord = chord["Wing root"], #meters
+                    twist = twist["Wing root"], #degrees
                     airfoil=airfoil_main_wing, # Flap # Control surfaces are applied between a given XSec and the next one.
                     ),
                 asb.WingXSec(#Mid
-                    xyz_le = [0.1,0.5,0],
-                    chord = 0.13,
-                    twist = -2,
+                    xyz_le = [wing_span["Wing center"]*np.sin(np.deg2rad(sweep_angle["Wing center"])),wing_span["Wing center"],wing_span["Wing center"]*np.sin(np.deg2rad(dihedral_angle["Wing center"]))],
+                    chord = chord["Wing mid"],
+                    twist = twist["Wing mid"],
                     airfoil=airfoil_main_wing,
                 )
                 ]
@@ -82,34 +148,33 @@ Tip_wing = asb.Wing(
             symmetric=True,
             xsecs=[# The wing's cross ("X") sections, or "XSecs"
                     asb.WingXSec(#Mid
-                    xyz_le = [0.1,0.5,0],
-                    chord = 0.13,
-                    twist = -2,
+                    xyz_le = [wing_span["Wing center"]*np.sin(np.deg2rad(sweep_angle["Wing center"])),wing_span["Wing center"],wing_span["Wing center"]*np.sin(np.deg2rad(dihedral_angle["Wing center"]))],
+                    chord = chord["Wing mid"],
+                    twist = twist["Wing mid"],
                     airfoil=airfoil_main_wing,
                 ),
                 asb.WingXSec(#Tip
-                    xyz_le = [0.1,0.8,0.12],
-                    chord = 0.05,
-                    twist = -10,
+                    xyz_le = [wing_span["Wing center"]*np.sin(np.deg2rad(sweep_angle["Wing center"]))+wing_span["Wing tip"]*np.sin(np.deg2rad(sweep_angle["Wing tip"])),wing_span["Wing center"]+wing_span["Wing tip"],wing_span["Wing center"]*np.sin(np.deg2rad(dihedral_angle["Wing center"]))+wing_span["Wing tip"]*np.sin(np.deg2rad(dihedral_angle["Wing tip"]))],
+                    chord = chord["Wing tip"],
+                    twist = twist["Wing tip"],
                     airfoil=airfoil_main_wing,
                     ),
                 ]
             )
-
 Tail_wing = asb.Wing(
             name="Vertical Stabilizer",
             symmetric=True,
             xsecs=[
                 asb.WingXSec(
                     xyz_le=[0, 0, 0],
-                    chord=0.1,
+                    chord=chord["Wing tail root"],
                     twist=0,
                     airfoil=asb.Airfoil("naca0012"),
                     
                 ),
                 asb.WingXSec(
                     xyz_le=[0, 0.2, 0.15],
-                    chord=0.06,
+                    chord=chord["Wing tail tip"],
                     twist=0,
                     airfoil=asb.Airfoil("naca0012")
                 )
@@ -120,25 +185,24 @@ fuselage_tip = asb.Fuselage(
         name="Fuselage tip",
         xsecs=[
             asb.FuselageXSec(
-                xyz_c = [ xi*0.1,0,0],
+                xyz_c = [ xi*0.1-0.1,0,0],
                 # radius = np.sin(xi/0.1*np.pi/2)*0.05
-                radius = np.sqrt(1-(-1+xi)**2)*0.025
+                radius = np.sqrt(1-(-1+xi)**2)*0.015
             )for xi in np.cosspace(0,1,30)            
 
 
         ]
         )
-
 fuselage_body = asb.Fuselage(
         name="Fuselage body",
         xsecs=[
             asb.FuselageXSec(
-                xyz_c = [0.1,0,0],
-                radius = 0.025               
+                xyz_c = [0,0,0],
+                radius = 0.015               
             ),
             asb.FuselageXSec(
                 xyz_c = [0.25,0,0],
-                radius = 0.025
+                radius = 0.015
             )
         ]
     )
@@ -147,31 +211,29 @@ fuselage_transition = asb.Fuselage(
         xsecs = [
             asb.FuselageXSec(
                 xyz_c=[0.25+xi/np.pi*0.1,0,0],
-                radius = (np.cos(xi)+1)*0.0125/2+0.0125
+                radius = (np.cos(xi)+1)*0.0075/2+0.0075
             )for xi in np.cosspace(0,np.pi,30)
         ]
     )
-
 fuselage_tail = asb.Fuselage(
         name = "Fuselage tail",
         xsecs=[
             asb.FuselageXSec(
                 xyz_c = [0.35,0,0],
-                radius = 0.0125               
+                radius = 0.0075               
             ),
             asb.FuselageXSec(
                 xyz_c = [0.7,0,0],
-                radius = 0.0125
+                radius = 0.0075
             )
         ]
     )
-
 fuselage_tail_tip = asb.Fuselage(
         name="Fuselage tail tip",
         xsecs=[
             asb.FuselageXSec(
                 xyz_c = [ 0.7+xi*0.05,0,0],
-                radius = np.sqrt(1-(xi)**2)*0.0125
+                radius = np.sqrt(1-(xi)**2)*0.0075
             )for xi in np.cosspace(0,1,30)
     ]
     )
@@ -196,8 +258,6 @@ airplane = asb.Airplane(
         fuselage_tail_tip
     ]
 )
-
-
 
 mass_props = {}
 
@@ -284,7 +344,7 @@ mass_props['battery'] = asb.mass_properties_from_radius_of_gyration(
 )
 
 mass_props["Payload"] = asb.mass_properties_from_radius_of_gyration(
-    mass=0.25, #To be determined
+    mass=1, #To be determined
     x_cg=0,
     z_cg=0
 )
@@ -292,74 +352,62 @@ mass_props["Payload"] = asb.mass_properties_from_radius_of_gyration(
 print(sum(mass_props.values()))
 
 
-Lift_required = sum(mass_props.values())*g
-
-## Aero builduup
-
-# ab_op_point = op_point.copy()
-# ab_op_point.alpha = np.linspace(-12, 12, 50)
-
-# aerobuildup_aero = asb.AeroBuildup(
-#     airplane=airplane,
-#     op_point=ab_op_point,
-#     xyz_ref=xyz_ref
-# ).run()
-# aerobuildup_aero["alpha"] = ab_op_point.alpha
-
-# print(aerobuildup_aero)
-
-## Nonlinear lifting Line 
-
-# nlll_op_point = op_point.copy()
-# nlll_op_point.alpha = np.linspace(-10, 10, 5)
-
-# nlll_aeros = [
-#     asb.NonlinearLiftingLine(
-#         airplane=airplane,
-#         op_point=op,
-#         xyz_ref=xyz_ref,
-#     ).run()
-#     for op in nlll_op_point
-# ]
-
-# nlll_aero = {}
-# for k in nlll_aeros[0].keys():
-#     nlll_aero[k] = np.array([
-#         aero[k]
-#         for aero in nlll_aeros
-#     ])
-# nlll_aero["alpha"] = nlll_op_point.alpha
-
-# print(nlll_aero)
-
-# ## Quasi Lifting line
-# ll_op_point = op_point.copy()
-# ll_op_point.alpha = np.linspace(0, 14, 4)
-
-# ll_aeros = [
-#     asb.LiftingLine(
-#         airplane=airplane,
-#         op_point=op,
-#         xyz_ref=xyz_ref,
-#     ).run()
-#     for op in ll_op_point
-# ]
-
-# ll_aero = {}
-# for k in ll_aeros[0].keys():
-#     ll_aero[k] = np.array([
-#         aero[k]
-#         for aero in ll_aeros
-#     ])
-# ll_aero["alpha"] = ll_op_point.alpha
-
-# print(ll_aero)
+total_mass = asb.MassProperties(mass=0)
+for k,v in mass_props.items():
+        total_mass = total_mass+v
 
 
+Lift_required = sum(mass_props.values())*g*1.2
 
-### VLM
+if method_type["VLM"]:
+    vlm = asb.VortexLatticeMethod(
+        airplane=airplane,
+        op_point=asb.OperatingPoint(
+            velocity=25,
+            alpha=alpha
+        ),
+        align_trailing_vortices_with_wind=False,
+    )
 
-# vlm.draw(show_kwargs=dict(jupyter_backend="static"))
+    aero = vlm.run()
 
-# if __name__ == '__main__':
-#     airplane.draw_three_view()
+    L_over_D = aero["CL"] / aero["CD"]
+
+
+    
+    vlm = sol(vlm)
+
+    aero = vlm.run()  # Returns a dictionary
+    for k, v in aero.items():
+        print(f"{k.rjust(4)} : {v}")
+    vlm.draw(show_kwargs=dict(jupyter_backend="static"))
+
+if method_type["Lifting line"]:
+        ll = asb.LiftingLine(
+              airplane = airplane,
+              op_point=asb.OperatingPoint(
+                    velocity=25,
+                    alpha=alpha,
+              )
+        )
+
+        aero = ll.run()
+
+        
+L_over_D = aero["CL"] / aero["CD"]
+opti.subject_to([
+      aero["L"] > total_mass.mass*g,
+      total_mass.mass<2
+    ])
+opti.minimize(-L_over_D)
+
+sol = opti.solve(max_iter=100)
+
+best_alpha = sol.value(alpha)
+final_weight = sol.value(total_mass.mass)
+print(f"Alpha for max L/D: {best_alpha:.3f} deg")
+print(f"Mass for max L/D: {final_weight:.3f} kg")
+print(sol.value(chord))
+
+sol(airplane).draw_three_view()
+        
