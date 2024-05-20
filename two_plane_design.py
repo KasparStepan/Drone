@@ -3,16 +3,43 @@ import matplotlib.pyplot as plt
 import aerosandbox.numpy as np
 import copy
 
-chord = {'Main_root':0.15,
-         'Main_mid_center': 0.15,
-         'Main_end_center': 0.13,
-         'Main_tip':0.05,
-         'Tail_root':0.13,
-         'Tail_tip':0.05}
-wingspan = {'Main_mid':0.2,
+opti = asb.Opti()
+
+battery_usable_capacity = 0.5 #-
+material_type = 'LW-PLA'
+voltage = 11.1 #V
+
+cruise_speed={'Endurance':15,
+              'Speed':25}
+
+endurance = { #h
+       'Endurance':1, 
+       'Speed':0.5}
+
+batteries = {#mAh
+       'Base':2200} 
+
+main_chord = opti.variable(init_guess=0.15,upper_bound=0.25,lower_bound=0.075)
+
+chord = { #m
+       'Main_root':main_chord,
+         'Main_mid_center': main_chord,
+         'Main_end_center': opti.variable(init_guess=0.13,upper_bound=0.2,lower_bound=0.075),
+         'Main_tip':opti.variable(init_guess=0.05,upper_bound=0.15,lower_bound=0.025),
+         'Tail_root':opti.variable(init_guess=0.13,upper_bound=0.25,lower_bound=0.05),
+         'Tail_tip':opti.variable(init_guess=0.13,upper_bound=0.25,lower_bound=0.02)}
+
+
+
+wingspan = { #m
+       'Main_mid':0.2,
             'Main_center':0.3,
             'Main_tip':0.15,
             'Tail':0.1}
+
+opti.subject_to([
+       wingspan['Main_mid']+wingspan['Main_center']+wingspan['Main_tip']<0.75,
+])
 
 sweep_angle = { #deg
       "Main_root": 0,
@@ -37,12 +64,12 @@ twist = { #deg
          'Tail_tip':-5,
 }
 
-fuselage_radius = {
-        'Big':0.02,
+fuselage_radius = { #m
+        'Big':0.015,
         'Small':0.01
 }
 
-airplane_length = 0.7
+airplane_length = opti.variable(init_guess=0.7,upper_bound=0.3,lower_bound=1.1) #m
 
 
 
@@ -253,7 +280,7 @@ infill_default = 0.2
 skin_thickness_default = 0.001
 
 filament_density = {
-          "PLA": 1250,
+          'PLA': 1250,
           "LW-PLA": 800
 }
 
@@ -283,7 +310,7 @@ infill = {
 
 for i in Speed_airplane.fuselages:
           mass_props[i.name] = asb.mass_properties_from_radius_of_gyration(
-                    (i.volume()*infill[i.name]+i.area_wetted()*skin_thickness[i.name])*filament_density["PLA"],
+                    (i.volume()*infill[i.name]+i.area_wetted()*skin_thickness[i.name])*filament_density[material_type],
                     x_cg = i.x_centroid_projected('XY')
           )
 
@@ -336,7 +363,7 @@ mass_props["Payload"] = asb.mass_properties_from_radius_of_gyration(
 )
 
 mass_props['Tail_wing'] = asb.mass_properties_from_radius_of_gyration(
-          mass = (Tail_wing.volume()*infill["Tail wing"]+Tail_wing.area("wetted")*skin_thickness["Tail wing"])*filament_density["PLA"],
+          mass = (Tail_wing.volume()*infill["Tail wing"]+Tail_wing.area("wetted")*skin_thickness["Tail wing"])*filament_density[material_type],
           x_cg = Tail_wing.aerodynamic_center(chord_fraction=0.25)[0],
           y_cg = Tail_wing.aerodynamic_center(chord_fraction=0.25)[1],
           z_cg = Tail_wing.aerodynamic_center(chord_fraction=0.25)[2]
@@ -348,14 +375,14 @@ speed_airplane_mass_props = mass_props.copy()
 endurance_airplane_mass_props = mass_props.copy()
 
 speed_airplane_mass_props['Speed_wing'] = asb.mass_properties_from_radius_of_gyration(
-          mass = (Speed_wing.volume()*infill["Tip wing"]+Speed_wing.area("wetted")*skin_thickness["Tip wing"])*filament_density["PLA"],
+          mass = (Speed_wing.volume()*infill["Tip wing"]+Speed_wing.area("wetted")*skin_thickness["Tip wing"])*filament_density[material_type],
           x_cg = Speed_wing.aerodynamic_center(chord_fraction=0.25)[0],
           y_cg = Speed_wing.aerodynamic_center(chord_fraction=0.25)[1],
           z_cg = Speed_wing.aerodynamic_center(chord_fraction=0.25)[2]
 )
 
 endurance_airplane_mass_props['Endurance_wing'] = asb.mass_properties_from_radius_of_gyration(
-          mass = (Endurance_wing.volume()*infill["Tip wing"]+Endurance_wing.area("wetted")*skin_thickness["Tip wing"])*filament_density["PLA"],
+          mass = (Endurance_wing.volume()*infill["Tip wing"]+Endurance_wing.area("wetted")*skin_thickness["Tip wing"])*filament_density[material_type],
           x_cg = Endurance_wing.aerodynamic_center(chord_fraction=0.25)[0],
           y_cg = Endurance_wing.aerodynamic_center(chord_fraction=0.25)[1],
           z_cg = Endurance_wing.aerodynamic_center(chord_fraction=0.25)[2]
@@ -374,22 +401,22 @@ for k,v in speed_airplane_mass_props.items():
 
 ### Letove podminky pro let
 
-alpha = np.linspace(-0,10,10)
+alpha = np.linspace(0,10,10*3)
 #alpha = np.array([0,1])
 speed_airplane_operating_point = asb.OperatingPoint(
         atmosphere=asb.Atmosphere(altitude=0),
-        velocity= 25,
+        velocity= cruise_speed['Speed'],
         alpha=alpha
 )
 
 endurance_airplane_operating_point = asb.OperatingPoint(
         atmosphere=asb.Atmosphere(altitude=0),
-        velocity= 15,
+        velocity= cruise_speed['Endurance'],
         alpha=alpha
 )
 
 speed_aero_data_run = [
-    asb.VortexLatticeMethod(
+    asb.LiftingLine(
         airplane=Speed_airplane,
         op_point=op,
     ).run()
@@ -406,7 +433,7 @@ for k in speed_aero_data_run[0].keys():
 
 
 endurance_aero_data_run = [
-    asb.VortexLatticeMethod(
+    asb.LiftingLine(
         airplane=Endurance_airplane,
         op_point=op,
     ).run() for op in endurance_airplane_operating_point
@@ -420,7 +447,7 @@ for k in endurance_aero_data_run[0].keys():
         for aero in endurance_aero_data_run
     ])
 
-
+# Calculation of airplane efficiency
 endurance_efficiency = endurance_aero_data['CL']/endurance_aero_data['CD']
 speed_efficiency = speed_aero_data['CL']/speed_aero_data['CD']
 
@@ -437,10 +464,18 @@ error_speed = speed_max_efficiency_AoA-speed_zero_pitch_AoA
 endurance_total_pitch = endurance_aero_data['Cm'] - (endurance_total_mass.x_cg-Endurance_wing.aerodynamic_center(chord_fraction=0.25)[0])*endurance_aero_data['CL']
 speed_total_pitch = speed_aero_data['Cm'] - (speed_total_mass.x_cg-Speed_wing.aerodynamic_center(chord_fraction=0.25)[0])*speed_aero_data['CL']
 
+endurance_endurance = battery_usable_capacity*batteries['Base']*voltage/(endurance_aero_data['D']*cruise_speed['Endurance']*1000)
+max_endurance_endurance = np.max(endurance_endurance)
 
 
+speed_endurance = battery_usable_capacity*batteries['Base']*voltage/(speed_aero_data['D']*cruise_speed['Speed']*1000)
+max_speed_endurance = np.max(speed_endurance)
 
-plt.subplot(3,2,1)
+opti.minimize(speed_total_mass+endurance_total_mass)
+
+sol = opti.solve(max_iter=100)
+
+plt.subplot(3,3,1)
 plt.plot(endurance_aero_data['CD'],endurance_aero_data['CL'],label = 'Endurance airplane')
 plt.plot(speed_aero_data['CD'],speed_aero_data['CL'],label = 'Speed airplane')
 plt.legend()
@@ -450,7 +485,7 @@ plt.xlabel('CD [-]')
 plt.ylabel('CL [-]')
 
 
-plt.subplot(3,2,2)
+plt.subplot(3,3,2)
 plt.plot(endurance_aero_data['alpha'],endurance_aero_data['Cm'],label = 'Endurance airplane')
 plt.plot(speed_aero_data['alpha'],speed_aero_data['Cm'],label = 'Speed airplane')
 plt.legend()
@@ -460,7 +495,7 @@ plt.xlabel('alpha [deg]')
 plt.ylabel('CM [-]')
 
 
-plt.subplot(3,2,3)
+plt.subplot(3,3,3)
 plt.plot(endurance_aero_data['alpha'],endurance_aero_data['CL'],label = 'Endurance airplane')
 plt.plot(speed_aero_data['alpha'],speed_aero_data['CL'],label = 'Speed airplane')
 plt.legend()
@@ -469,7 +504,7 @@ plt.title('Lift curve')
 plt.xlabel('alpha [deg]')
 plt.ylabel('CL [-]')
 
-plt.subplot(3,2,4)
+plt.subplot(3,3,4)
 plt.plot(endurance_aero_data['alpha'],endurance_aero_data['CD'],label = 'Endurance airplane')
 plt.plot(speed_aero_data['alpha'],speed_aero_data['CD'],label = 'Speed airplane')
 plt.legend()
@@ -479,20 +514,39 @@ plt.xlabel('alpha [deg]')
 plt.ylabel('CD [-]')
 
 
-plt.subplot(3,2,5)
+plt.subplot(3,3,5)
 plt.plot(endurance_aero_data['alpha'],endurance_total_pitch,label = 'Endurance airplane')
 plt.plot(speed_aero_data['alpha'],speed_total_pitch,label = 'Speed airplane')
 plt.legend()
 plt.grid()
-plt.title('Drag curve')
+plt.title('Airplane moment curve with CoG moment')
 plt.xlabel('alpha [deg]')
 plt.ylabel('Cm_airplane [-]')
+
+
+plt.subplot(3,3,6)
+plt.plot(endurance_aero_data['alpha'],endurance_efficiency,label = 'Endurance airplane')
+plt.plot(speed_aero_data['alpha'],speed_efficiency,label = 'Speed airplane')
+plt.legend()
+plt.grid()
+plt.title('Aerodynamic efficiency')
+plt.xlabel('alpha [deg]')
+plt.ylabel('CL/CD [-]')
+
+plt.subplot(3,3,7)
+plt.plot(endurance_aero_data['alpha'],endurance_endurance,label = 'Endurance airplane')
+plt.plot(speed_aero_data['alpha'],speed_endurance,label = 'Speed airplane')
+plt.legend()
+plt.grid()
+plt.title('Endurance')
+plt.xlabel('alpha [deg]')
+plt.ylabel('Time [h]')
+
 plt.show()
 
 
-print(endurance_total_mass.mass)
-print(speed_total_mass.mass)
 
+'''
 opti = asb.Opti()
 
 opti.variable(init_guess = 0.15,lower_bound = 0.1)
@@ -500,3 +554,5 @@ opti.variable(init_guess = 0.15,lower_bound = 0.1)
 opti.subject_to([
        chord["Wing root"]>chord["Wing mid"],
 ])
+
+'''
