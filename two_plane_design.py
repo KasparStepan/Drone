@@ -9,8 +9,8 @@ chord = {'Main_root':0.15,
          'Main_tip':0.05,
          'Tail_root':0.13,
          'Tail_tip':0.05}
-wingspan = {'Main_mid':0.3,
-            'Main_center':0.2,
+wingspan = {'Main_mid':0.2,
+            'Main_center':0.3,
             'Main_tip':0.15,
             'Tail':0.1}
 
@@ -25,7 +25,7 @@ dihedral_angle = { #deg
       "Main_root": 0,
       "Main_center" : 0,
       'Main_tip':10,
-      "Tail": 25,
+      "Tail": 60,
 }
 
 twist = { #deg
@@ -33,11 +33,16 @@ twist = { #deg
          'Main_mid_center': 0,
          'Main_end_center': 0,
          'Main_tip':0,
-         'Tail_root':0,
-         'Tail_root':0,
+         'Tail_root':-5,
+         'Tail_tip':-5,
 }
 
-airplane_length = 1
+fuselage_radius = {
+        'Big':0.02,
+        'Small':0.01
+}
+
+airplane_length = 0.7
 
 
 
@@ -130,7 +135,7 @@ Tail_wing = asb.Wing(
                 0,
                 0],
         chord=chord['Tail_root'],
-        twist=0,
+        twist=twist['Tail_root'],
         airfoil=asb.Airfoil('naca0012')
         ),
         asb.WingXSec(
@@ -138,7 +143,7 @@ Tail_wing = asb.Wing(
                 wingspan['Tail']*np.tan(np.deg2rad(dihedral_angle['Tail'])),
                 wingspan['Tail']],
         chord=chord['Tail_tip'],
-        twist=0,
+        twist=twist['Tail_tip'],
         airfoil=asb.Airfoil('naca0012')
         )
     ]
@@ -150,9 +155,9 @@ fuselage_tip = asb.Fuselage(
         name="Fuselage tip",
         xsecs=[
             asb.FuselageXSec(
-                xyz_c = [ xi*0.1-0.1,0,0],
+                xyz_c = [ xi*0.1*airplane_length-0.1*airplane_length,0,0],
                 # radius = np.sin(xi/0.1*np.pi/2)*0.05
-                radius = np.sqrt(1-(-1+xi)**2)*0.015
+                radius = np.sqrt(1-(-1+xi)**2)*fuselage_radius['Big']
             )for xi in np.cosspace(0,1,30)            
 
 
@@ -163,11 +168,11 @@ fuselage_body = asb.Fuselage(
         xsecs=[
             asb.FuselageXSec(
                 xyz_c = [0,0,0],
-                radius = 0.015               
+                radius = fuselage_radius['Big']               
             ),
             asb.FuselageXSec(
-                xyz_c = [0.25,0,0],
-                radius = 0.015
+                xyz_c = [chord['Main_root']*1.2,0,0],
+                radius = fuselage_radius['Big'] 
             )
         ]
     )
@@ -175,8 +180,8 @@ fuselage_transition = asb.Fuselage(
         name ="Fuselage transition",
         xsecs = [
             asb.FuselageXSec(
-                xyz_c=[0.25+xi/np.pi*0.1,0,0],
-                radius = (np.cos(xi)+1)*0.0075/2+0.0075
+                xyz_c=[chord['Main_root']*1.2+xi/np.pi*airplane_length*0.1,0,0],
+                radius = (np.cos(xi)+1)*(fuselage_radius['Big']-fuselage_radius['Small'])/2+fuselage_radius['Small']
             )for xi in np.cosspace(0,np.pi,30)
         ]
     )
@@ -184,12 +189,12 @@ fuselage_tail = asb.Fuselage(
         name = "Fuselage tail",
         xsecs=[
             asb.FuselageXSec(
-                xyz_c = [0.35,0,0],
-                radius = 0.0075               
+                xyz_c = [chord['Main_root']*1.2+airplane_length*0.1,0,0],
+                radius = fuselage_radius['Small']               
             ),
             asb.FuselageXSec(
                 xyz_c = [airplane_length,0,0],
-                radius = 0.0075
+                radius = fuselage_radius['Small']  
             )
         ]
     )
@@ -198,7 +203,7 @@ fuselage_tail_tip = asb.Fuselage(
         xsecs=[
             asb.FuselageXSec(
                 xyz_c = [ airplane_length+xi*0.05,0,0],
-                radius = np.sqrt(1-(xi)**2)*0.0075
+                radius = np.sqrt(1-(xi)**2)*fuselage_radius['Small']  
             )for xi in np.cosspace(0,1,30)
     ]
     )
@@ -338,8 +343,9 @@ mass_props['Tail_wing'] = asb.mass_properties_from_radius_of_gyration(
 
 )
 
-speed_airplane_mass_props = mass_props
-endurance_airplane_mass_props = mass_props
+
+speed_airplane_mass_props = mass_props.copy()
+endurance_airplane_mass_props = mass_props.copy()
 
 speed_airplane_mass_props['Speed_wing'] = asb.mass_properties_from_radius_of_gyration(
           mass = (Speed_wing.volume()*infill["Tip wing"]+Speed_wing.area("wetted")*skin_thickness["Tip wing"])*filament_density["PLA"],
@@ -355,10 +361,21 @@ endurance_airplane_mass_props['Endurance_wing'] = asb.mass_properties_from_radiu
           z_cg = Endurance_wing.aerodynamic_center(chord_fraction=0.25)[2]
 )
 
+
+
+
+endurance_total_mass = asb.MassProperties(mass=0)
+for k,v in endurance_airplane_mass_props.items():
+        endurance_total_mass = endurance_total_mass+v
+
+speed_total_mass = asb.MassProperties(mass=0)
+for k,v in speed_airplane_mass_props.items():
+        speed_total_mass = speed_total_mass+v
+
 ### Letove podminky pro let
 
-alpha = np.linspace(-5,18,18*3)
-
+alpha = np.linspace(-0,10,10)
+#alpha = np.array([0,1])
 speed_airplane_operating_point = asb.OperatingPoint(
         atmosphere=asb.Atmosphere(altitude=0),
         velocity= 25,
@@ -372,7 +389,7 @@ endurance_airplane_operating_point = asb.OperatingPoint(
 )
 
 speed_aero_data_run = [
-    asb.LiftingLine(
+    asb.VortexLatticeMethod(
         airplane=Speed_airplane,
         op_point=op,
     ).run()
@@ -389,7 +406,7 @@ for k in speed_aero_data_run[0].keys():
 
 
 endurance_aero_data_run = [
-    asb.LiftingLine(
+    asb.VortexLatticeMethod(
         airplane=Endurance_airplane,
         op_point=op,
     ).run() for op in endurance_airplane_operating_point
@@ -416,11 +433,14 @@ speed_zero_pitch_AoA = speed_aero_data['alpha'][np.argmin(np.abs(speed_aero_data
 error_endurance = endurance_max_efficiency_AoA-endurance_zero_pitch_AoA
 error_speed = speed_max_efficiency_AoA-speed_zero_pitch_AoA
 
-print(error_endurance)
-print(error_speed)
+
+endurance_total_pitch = endurance_aero_data['Cm'] - (endurance_total_mass.x_cg-Endurance_wing.aerodynamic_center(chord_fraction=0.25)[0])*endurance_aero_data['CL']
+speed_total_pitch = speed_aero_data['Cm'] - (speed_total_mass.x_cg-Speed_wing.aerodynamic_center(chord_fraction=0.25)[0])*speed_aero_data['CL']
 
 
-plt.subplot(2,2,1)
+
+
+plt.subplot(3,2,1)
 plt.plot(endurance_aero_data['CD'],endurance_aero_data['CL'],label = 'Endurance airplane')
 plt.plot(speed_aero_data['CD'],speed_aero_data['CL'],label = 'Speed airplane')
 plt.legend()
@@ -430,7 +450,7 @@ plt.xlabel('CD [-]')
 plt.ylabel('CL [-]')
 
 
-plt.subplot(2,2,2)
+plt.subplot(3,2,2)
 plt.plot(endurance_aero_data['alpha'],endurance_aero_data['Cm'],label = 'Endurance airplane')
 plt.plot(speed_aero_data['alpha'],speed_aero_data['Cm'],label = 'Speed airplane')
 plt.legend()
@@ -440,7 +460,7 @@ plt.xlabel('alpha [deg]')
 plt.ylabel('CM [-]')
 
 
-plt.subplot(2,2,3)
+plt.subplot(3,2,3)
 plt.plot(endurance_aero_data['alpha'],endurance_aero_data['CL'],label = 'Endurance airplane')
 plt.plot(speed_aero_data['alpha'],speed_aero_data['CL'],label = 'Speed airplane')
 plt.legend()
@@ -449,7 +469,7 @@ plt.title('Lift curve')
 plt.xlabel('alpha [deg]')
 plt.ylabel('CL [-]')
 
-plt.subplot(2,2,4)
+plt.subplot(3,2,4)
 plt.plot(endurance_aero_data['alpha'],endurance_aero_data['CD'],label = 'Endurance airplane')
 plt.plot(speed_aero_data['alpha'],speed_aero_data['CD'],label = 'Speed airplane')
 plt.legend()
@@ -457,4 +477,26 @@ plt.grid()
 plt.title('Drag curve')
 plt.xlabel('alpha [deg]')
 plt.ylabel('CD [-]')
+
+
+plt.subplot(3,2,5)
+plt.plot(endurance_aero_data['alpha'],endurance_total_pitch,label = 'Endurance airplane')
+plt.plot(speed_aero_data['alpha'],speed_total_pitch,label = 'Speed airplane')
+plt.legend()
+plt.grid()
+plt.title('Drag curve')
+plt.xlabel('alpha [deg]')
+plt.ylabel('Cm_airplane [-]')
 plt.show()
+
+
+print(endurance_total_mass.mass)
+print(speed_total_mass.mass)
+
+opti = asb.Opti()
+
+opti.variable(init_guess = 0.15,lower_bound = 0.1)
+
+opti.subject_to([
+       chord["Wing root"]>chord["Wing mid"],
+])
