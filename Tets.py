@@ -10,14 +10,14 @@ g = 9.80665
 altitude_flight = 0
 atmosphere = asb.Atmosphere(altitude=altitude_flight)
 freestream_velocity = 25
-stall_speed = 10
+# alpha = 4
 density  = atmosphere.density()
 viscosity = atmosphere.dynamic_viscosity()
 pressure = atmosphere.pressure()
 
 ### Optimization variables
 
-opti = asb.Opti()
+# opti = asb.Opti()
 
 method_type = {
        "VLM": False,
@@ -26,8 +26,8 @@ method_type = {
        "AVL": False,
 }
 
-alpha = opti.variable(init_guess=4,lower_bound = 0, upper_bound = 6)
-twist_root = opti.variable(init_guess=2)
+# alpha = opti.variable(init_guess=4,lower_bound = 0, upper_bound = 6)
+
 
 
 
@@ -36,31 +36,31 @@ twist_root = opti.variable(init_guess=2)
 max_taper = 0.7
 
 chord = { #m
-      "Wing root": opti.variable(init_guess = 0.15,lower_bound = 0.1),
-      "Wing mid": opti.variable(init_guess = 0.13,lower_bound = 0.1),
-      "Wing tip" : opti.variable(init_guess = 0.05,lower_bound = 0.03),
+      "Wing root":0.15,
+      "Wing mid": 0.13,
+      "Wing tip" : 0.05,
       "Wing tail root": 0.1,
       "Wing tail tip":0.06,
 }
 
-opti.subject_to([
-       chord["Wing root"]>chord["Wing mid"],
-       chord["Wing mid"]>chord["Wing tip"],
-       chord["Wing tail root"]>chord["Wing tail tip"],
-       (chord["Wing mid"]/chord["Wing root"])>max_taper,
-       (chord["Wing tip"]/chord["Wing mid"])>max_taper
-])
+# opti.subject_to([
+#        chord["Wing root"]>chord["Wing mid"],
+#        chord["Wing mid"]>chord["Wing tip"],
+#        chord["Wing tail root"]>chord["Wing tail tip"],
+#        (chord["Wing mid"]/chord["Wing root"])>max_taper,
+#        (chord["Wing tip"]/chord["Wing mid"])>max_taper
+# ])
 
 wing_span = { #m
-      "Wing center": opti.variable(init_guess = 0.4,lower_bound = 0.1),
-      "Wing tip" : opti.variable(init_guess = 0.2,lower_bound = 0.1),
+      "Wing center": 0.4,
+      "Wing tip" : 0.2,
       "Wing tail": 0.15,
 }
 
-opti.subject_to([
-      wing_span["Wing center"]+wing_span["Wing tip"]<=0.75,
-      wing_span["Wing center"]+wing_span["Wing tip"]>=0.3
-])
+# opti.subject_to([
+#       wing_span["Wing center"]+wing_span["Wing tip"]<=0.75,
+#       wing_span["Wing center"]+wing_span["Wing tip"]>=0.3
+# ])
 
 sweep_angle = { #deg
       "Wing center": 0,
@@ -349,7 +349,7 @@ mass_props["Payload"] = asb.mass_properties_from_radius_of_gyration(
     z_cg=0
 )
 
-
+print(sum(mass_props.values()))
 
 
 total_mass = asb.MassProperties(mass=0)
@@ -357,64 +357,27 @@ for k,v in mass_props.items():
         total_mass = total_mass+v
 
 
-
+Lift_required = sum(mass_props.values())*g*1.2
 
 vlm_op_point = asb.OperatingPoint(
         velocity=25,
 )
-vlm_op_point.alpha = np.linspace(-12, 12, 13)
+vlm_op_point.alpha = 0
 
 vlm_aeros = [
     asb.VortexLatticeMethod(
         airplane=airplane,
-        op_point=op,
+        op_point=vlm_op_point,
         spanwise_resolution=5
     ).run()
-    for op in vlm_op_point
+
 ]
 
-vlm_aero = {}
-
-for k in vlm_aeros[0].keys():
-    vlm_aero[k] = np.array([
-        aero[k]
-        for aero in vlm_aeros
-    ])
+print(vlm_aeros)
 
 
 
 
 
-### Design conditions
-wing_area = Center_wing.area()+Tip_wing.area()
 
-
-## Stall speed
-
-stall_speed_actual = np.sqrt(2*total_mass.mass*g/(wing_area*density*np.max(vlm_aero["CL"])))
-stall_speed_ratio = stall_speed_actual/stall_speed
-
-opti.subject_to([
-       stall_speed_ratio>1,
-])
-
-## 
-
-L_over_D = vlm_aero["CL"] / vlm_aero["CD"]
-print(np.min(L_over_D))
-opti.subject_to([
-      aero["L"] > total_mass.mass*g,
-      total_mass.mass<2
-    ])
-opti.minimize(-L_over_D)
-
-sol = opti.solve(max_iter=100)
-
-best_alpha = sol.value(alpha)
-final_weight = sol.value(total_mass.mass)
-print(f"Alpha for max L/D: {best_alpha:.3f} deg")
-print(f"Mass for max L/D: {final_weight:.3f} kg")
-print(sol.value(chord))
-
-sol(airplane).draw_three_view()
         
