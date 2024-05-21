@@ -3,6 +3,84 @@ import matplotlib.pyplot as plt
 import aerosandbox.numpy as np
 import copy
 
+def plot_results(endurance,speed):
+    plt.subplot(3,3,1)
+    plt.plot(endurance['CD'],endurance['CL'],label = 'Endurance airplane')
+    plt.plot(speed['CD'],speed['CL'],label = 'Speed airplane')
+    plt.legend()
+    plt.grid()
+    plt.title('Aerodynamic polar')
+    plt.xlabel('CD [-]')
+    plt.ylabel('CL [-]')
+
+
+    plt.subplot(3,3,2)
+    plt.plot(endurance['alpha'],endurance['Cm'],label = 'Endurance airplane')
+    plt.plot(speed['alpha'],speed['Cm'],label = 'Speed airplane')
+    plt.legend()
+    plt.grid()
+    plt.title('Moment polar')
+    plt.xlabel('alpha [deg]')
+    plt.ylabel('CM [-]')
+
+
+    plt.subplot(3,3,3)
+    plt.plot(endurance['alpha'],endurance['CL'],label = 'Endurance airplane')
+    plt.plot(speed['alpha'],speed['CL'],label = 'Speed airplane')
+    plt.legend()
+    plt.grid()
+    plt.title('Lift curve')
+    plt.xlabel('alpha [deg]')
+    plt.ylabel('CL [-]')
+
+    plt.subplot(3,3,4)
+    plt.plot(endurance['alpha'],endurance['CD'],label = 'Endurance airplane')   
+    plt.plot(speed['alpha'],speed['CD'],label = 'Speed airplane')
+    plt.legend()
+    plt.grid()
+    plt.title('Drag curve')
+    plt.xlabel('alpha [deg]')
+    plt.ylabel('CD [-]')
+
+
+    plt.subplot(3,3,5)
+    plt.plot(endurance['alpha'],endurance['total_pitch'],label = 'Endurance airplane')
+    plt.plot(speed['alpha'],speed['total_pitch'],label= 'Speed airplane')
+    plt.legend()
+    plt.grid()
+    plt.title('Airplane moment curve with CoG moment')
+    plt.xlabel('alpha [deg]')
+    plt.ylabel('Cm_airplane [-]')
+
+
+    plt.subplot(3,3,6)
+    plt.plot(endurance['alpha'],endurance['efficiency'],label = 'Endurance airplane')
+    plt.plot(speed['alpha'],speed['efficiency'],label = 'Speed airplane')
+    plt.legend()
+    plt.grid()
+    plt.title('Aerodynamic efficiency')
+    plt.xlabel('alpha [deg]')
+    plt.ylabel('CL/CD [-]')
+
+    plt.subplot(3,3,7)
+    plt.plot(endurance['alpha'],endurance['endurance'],label = 'Endurance airplane')
+    plt.plot(speed['alpha'],speed['endurance'],label = 'Speed airplane')
+    plt.legend()
+    plt.grid()
+    plt.title('Endurance')
+    plt.xlabel('alpha [deg]')
+    plt.ylabel('Time [h]')
+
+    plt.show()
+
+
+def find_zero(aoa,array):
+      for i in range(len(array)-1):
+            if (array[i]*array[i+1])<0:
+                  print(i + array[i]/(array[i]-array[i+1]))
+                  return (i + array[i]*(aoa[i+1]-aoa[i])/(array[i]-array[i+1]))
+            
+
 opti = asb.Opti()
 
 battery_usable_capacity = 0.5 #-
@@ -19,15 +97,16 @@ endurance = { #h
 batteries = {#mAh
        'Base':2200} 
 
-main_chord = opti.variable(init_guess=0.15,upper_bound=0.25,lower_bound=0.075)
+main_chord = 0.15#opti.variable(init_guess=0.15,upper_bound=0.25,lower_bound=0.075)
 
 chord = { #m
        'Main_root':main_chord,
          'Main_mid_center': main_chord,
-         'Main_end_center': opti.variable(init_guess=0.13,upper_bound=0.2,lower_bound=0.075),
-         'Main_tip':opti.variable(init_guess=0.05,upper_bound=0.15,lower_bound=0.025),
-         'Tail_root':opti.variable(init_guess=0.13,upper_bound=0.25,lower_bound=0.05),
-         'Tail_tip':opti.variable(init_guess=0.13,upper_bound=0.25,lower_bound=0.02)}
+         'Main_end_center': 0.13,#opti.variable(init_guess=0.13,upper_bound=0.2,lower_bound=0.075),
+         'Main_tip':0.05,#opti.variable(init_guess=0.05,upper_bound=0.15,lower_bound=0.025),
+         'Tail_root':0.13,#opti.variable(init_guess=0.13,upper_bound=0.25,lower_bound=0.05),
+         'Tail_tip':0.05 #opti.variable(init_guess=0.1,upper_bound=0.15,lower_bound=0.02)
+         }
 
 
 
@@ -60,8 +139,8 @@ twist = { #deg
          'Main_mid_center': 0,
          'Main_end_center': 0,
          'Main_tip':0,
-         'Tail_root':-5,
-         'Tail_tip':-5,
+         'Tail_root':opti.variable(init_guess=-5,upper_bound=2,lower_bound=-5),
+         'Tail_tip':opti.variable(init_guess=-5,upper_bound=2,lower_bound=-5),
 }
 
 fuselage_radius = { #m
@@ -401,7 +480,8 @@ for k,v in speed_airplane_mass_props.items():
 
 ### Letove podminky pro let
 
-alpha = np.linspace(0,10,10*3)
+alpha = np.linspace(0,10,10)
+range_aoa = len(alpha)
 #alpha = np.array([0,1])
 speed_airplane_operating_point = asb.OperatingPoint(
         atmosphere=asb.Atmosphere(altitude=0),
@@ -448,111 +528,54 @@ for k in endurance_aero_data_run[0].keys():
     ])
 
 # Calculation of airplane efficiency
-endurance_efficiency = endurance_aero_data['CL']/endurance_aero_data['CD']
-speed_efficiency = speed_aero_data['CL']/speed_aero_data['CD']
+endurance_aero_data['efficiency'] = endurance_aero_data['CL']/endurance_aero_data['CD']
+speed_aero_data['efficiency'] = speed_aero_data['CL']/speed_aero_data['CD']
 
-endurance_max_efficiency_AoA = endurance_aero_data['alpha'][np.argmax(endurance_efficiency)]
-speed_max_efficiency_AoA = speed_aero_data['alpha'][np.argmax(speed_efficiency)]
+endurance_max_efficiency= np.max(endurance_aero_data['efficiency'])
 
-endurance_zero_pitch_AoA = endurance_aero_data['alpha'][np.argmin(np.abs(endurance_aero_data['Cm']))]
-speed_zero_pitch_AoA = speed_aero_data['alpha'][np.argmin(np.abs(speed_aero_data['Cm']))]
+endurance_max_efficiency_AoA = 0
 
-error_endurance = endurance_max_efficiency_AoA-endurance_zero_pitch_AoA
-error_speed = speed_max_efficiency_AoA-speed_zero_pitch_AoA
+speed_max_efficiency = np.max(speed_aero_data['efficiency'])
+speed_max_efficiency_AoA = 0
 
 
-endurance_total_pitch = endurance_aero_data['Cm'] - (endurance_total_mass.x_cg-Endurance_wing.aerodynamic_center(chord_fraction=0.25)[0])*endurance_aero_data['CL']
-speed_total_pitch = speed_aero_data['Cm'] - (speed_total_mass.x_cg-Speed_wing.aerodynamic_center(chord_fraction=0.25)[0])*speed_aero_data['CL']
+endurance_zero_pitch_AoA = find_zero(endurance_aero_data['alpha'],endurance_aero_data['Cm'])
+speed_zero_pitch_AoA = find_zero(speed_aero_data['alpha'],speed_aero_data['Cm'])
 
-endurance_endurance = battery_usable_capacity*batteries['Base']*voltage/(endurance_aero_data['D']*cruise_speed['Endurance']*1000)
-max_endurance_endurance = np.max(endurance_endurance)
+endurance_pitch_error = endurance_max_efficiency_AoA-endurance_zero_pitch_AoA
+speed_pitch_error = speed_max_efficiency_AoA-speed_zero_pitch_AoA
 
 
-speed_endurance = battery_usable_capacity*batteries['Base']*voltage/(speed_aero_data['D']*cruise_speed['Speed']*1000)
-max_speed_endurance = np.max(speed_endurance)
+endurance_aero_data['total_pitch'] = endurance_aero_data['Cm'] - (endurance_total_mass.x_cg-Endurance_wing.aerodynamic_center(chord_fraction=0.25)[0])*endurance_aero_data['CL']
+speed_aero_data['total_pitch'] = speed_aero_data['Cm'] - (speed_total_mass.x_cg-Speed_wing.aerodynamic_center(chord_fraction=0.25)[0])*speed_aero_data['CL']
 
-opti.minimize(speed_total_mass+endurance_total_mass)
+endurance_aero_data['endurance'] = battery_usable_capacity*batteries['Base']*voltage/(endurance_aero_data['D']*cruise_speed['Endurance']*1000)
+max_endurance_endurance = np.max(endurance_aero_data['endurance'])
+
+
+speed_aero_data['endurance'] = battery_usable_capacity*batteries['Base']*voltage/(speed_aero_data['D']*cruise_speed['Speed']*1000)
+max_speed_endurance = np.max(speed_aero_data['endurance'])
+
+opti.minimize(endurance_pitch_error+speed_pitch_error)
 
 sol = opti.solve(max_iter=100)
 
-plt.subplot(3,3,1)
-plt.plot(endurance_aero_data['CD'],endurance_aero_data['CL'],label = 'Endurance airplane')
-plt.plot(speed_aero_data['CD'],speed_aero_data['CL'],label = 'Speed airplane')
-plt.legend()
-plt.grid()
-plt.title('Aerodynamic polar')
-plt.xlabel('CD [-]')
-plt.ylabel('CL [-]')
 
 
-plt.subplot(3,3,2)
-plt.plot(endurance_aero_data['alpha'],endurance_aero_data['Cm'],label = 'Endurance airplane')
-plt.plot(speed_aero_data['alpha'],speed_aero_data['Cm'],label = 'Speed airplane')
-plt.legend()
-plt.grid()
-plt.title('Moment polar')
-plt.xlabel('alpha [deg]')
-plt.ylabel('CM [-]')
+print(f"Endurance airplane")
+print(f"Total mass = {endurance_total_mass.mass:3} kg")
+print(f"Maximal aerodynamic effciency AoA = {endurance_max_efficiency_AoA:2}")
+print(f"Zero pitch AoA = {endurance_zero_pitch_AoA:2} deg")
+print(f"Pitch AoA diference = {endurance_pitch_error} deg")
+print(f"Maximal endurance = {np.max(endurance_aero_data['endurance']):0} h")
+
+print(f"Speed airplane")
+print(f"Total mass = {speed_total_mass.mass:3} kg")
+print(f"Maximal aerodynamic effciency AoA = {speed_max_efficiency_AoA:2}")
+print(f"Zero pitch AoA = {speed_zero_pitch_AoA:2} deg")
+print(f"Pitch AoA diference = {speed_pitch_error} deg")
+print(f"Maximal endurance = {np.max(speed_aero_data['endurance']):0} h")
+
+plot_results(sol(eval(endurance_aero_data)),sol(eval(speed_aero_data)))
 
 
-plt.subplot(3,3,3)
-plt.plot(endurance_aero_data['alpha'],endurance_aero_data['CL'],label = 'Endurance airplane')
-plt.plot(speed_aero_data['alpha'],speed_aero_data['CL'],label = 'Speed airplane')
-plt.legend()
-plt.grid()
-plt.title('Lift curve')
-plt.xlabel('alpha [deg]')
-plt.ylabel('CL [-]')
-
-plt.subplot(3,3,4)
-plt.plot(endurance_aero_data['alpha'],endurance_aero_data['CD'],label = 'Endurance airplane')
-plt.plot(speed_aero_data['alpha'],speed_aero_data['CD'],label = 'Speed airplane')
-plt.legend()
-plt.grid()
-plt.title('Drag curve')
-plt.xlabel('alpha [deg]')
-plt.ylabel('CD [-]')
-
-
-plt.subplot(3,3,5)
-plt.plot(endurance_aero_data['alpha'],endurance_total_pitch,label = 'Endurance airplane')
-plt.plot(speed_aero_data['alpha'],speed_total_pitch,label = 'Speed airplane')
-plt.legend()
-plt.grid()
-plt.title('Airplane moment curve with CoG moment')
-plt.xlabel('alpha [deg]')
-plt.ylabel('Cm_airplane [-]')
-
-
-plt.subplot(3,3,6)
-plt.plot(endurance_aero_data['alpha'],endurance_efficiency,label = 'Endurance airplane')
-plt.plot(speed_aero_data['alpha'],speed_efficiency,label = 'Speed airplane')
-plt.legend()
-plt.grid()
-plt.title('Aerodynamic efficiency')
-plt.xlabel('alpha [deg]')
-plt.ylabel('CL/CD [-]')
-
-plt.subplot(3,3,7)
-plt.plot(endurance_aero_data['alpha'],endurance_endurance,label = 'Endurance airplane')
-plt.plot(speed_aero_data['alpha'],speed_endurance,label = 'Speed airplane')
-plt.legend()
-plt.grid()
-plt.title('Endurance')
-plt.xlabel('alpha [deg]')
-plt.ylabel('Time [h]')
-
-plt.show()
-
-
-
-'''
-opti = asb.Opti()
-
-opti.variable(init_guess = 0.15,lower_bound = 0.1)
-
-opti.subject_to([
-       chord["Wing root"]>chord["Wing mid"],
-])
-
-'''
