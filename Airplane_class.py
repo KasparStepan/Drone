@@ -298,7 +298,7 @@ class Airplane():
                                 for aero in self.aero_data_run
                                 ])
                       
-                self.eval_efficiency()
+                self.evaluation()
 
         def runLL(self):
                 self.create_operating_point()
@@ -316,14 +316,51 @@ class Airplane():
                                 for aero in self.aero_data_run
                                 ])
                         
-                self.eval_efficiency()
+                self.evaluation()
+                
                         
                 
-        
+        def evaluation(self):
+                self.eval_efficiency()
+                self.eval_pitch_criteria()
+                self.eval_negative_slope_pitch()
+                self.eval_total_pitch()
+
         def eval_efficiency(self):
                 # Calculation of airplane efficiency
                 self.aero_data['efficiency'] = self.aero_data['CL']/self.aero_data['CD']
                 self.aero_data['total_pitch'] = self.aero_data['Cm'] - (self.total_mass.x_cg-self.Wing.aerodynamic_center(chord_fraction=0.25)[0])*self.aero_data['CL']
+                
+                self.max_efficiency_AoA = self.aero_data['alpha'][np.argmax(self.aero_data['efficiency'])]
+                
+                return self.max_efficiency_AoA
+
+
+        def eval_pitch_criteria(self):
+                ## Evaluation of difference of angle of attack of zero pitch and maximum efficiency
+
+                for i in range(len(self.aero_data['Cm'])-1):
+                        if (self.aero_data['Cm'][i]*self.aero_data['Cm'][i+1]) < 0:
+                                self.zero_pitch_aoa = self.aero_data['alpha'][i] + self.aero_data['Cm'][i]*(self.aero_data['alpha'][i+1]-self.aero_data['alpha'][i])/(self.aero_data['Cm'][i]-self.aero_data['Cm'][i+1])
+                                
+
+                self.pitch_criteria = np.abs(self.max_efficiency_AoA-self.zero_pitch_aoa)
+                return self.pitch_criteria               
+
+                 
+        def eval_total_pitch(self):
+                for i in range(len(self.aero_data['alpha'])):
+                        if self.aero_data['alpha'][i] == 0:
+                                self.zero_aoa_pitch = self.aero_data['Cm'][i]
+                return self.zero_aoa_pitch
+
+        def eval_negative_slope_pitch(self):
+                for i in range(len(self.aero_data['Cm'])-1):
+                        if (self.aero_data['Cm'][i+1]-self.aero_data['Cm'][i]) > 0:
+                                self.pitch_slope_check = False
+                        else:
+                                self.pitch_slope_check = True
+                return self.pitch_slope_check
         
         def set_name(self,name):
                 self.name = name 

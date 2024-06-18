@@ -56,18 +56,27 @@ airplane_length = 1.2
 endurance_plane = Airplane_class.Airplane(name = "Endurance plane",airplane_type="Endurance",wingspan=wingspan,chord=chord,twist=twist,sweep_angle=sweep_angle,dihedral_angle=dihedral_angle,fuselage_radius=fuselage_radius,airplane_length=airplane_length)
 speed_plane = Airplane_class.Airplane(name = "Speed plane",airplane_type="Speed",wingspan=wingspan,chord=chord,twist=twist,sweep_angle=sweep_angle,dihedral_angle=dihedral_angle,fuselage_radius=fuselage_radius,airplane_length=airplane_length)
 
-
-
-endurance_plane.draw_airplane()
-'''
 endurance_plane.runVLM()
 speed_plane.runVLM()
+
+print(f"Parameters evaluated for: {endurance_plane.name}")
+print(f'Maximum efficiency of airplane is at AoA: {endurance_plane.max_efficiency_AoA} deg')
+print(f'AoA difference for maximum efficiency and zero pitch: {endurance_plane.pitch_criteria} [deg]')
+print(f'Pitch moment slope is negative acros the whole range of AoA: {endurance_plane.pitch_slope_check}')
+print(f'Zero pitch is at AoA: {endurance_plane.zero_aoa_pitch} [deg]')
+
+print(f"Parameters evaluated for: {speed_plane.name}")
+print(f'Maximum efficiency of airplane is at AoA: {speed_plane.max_efficiency_AoA} deg')
+print(f'AoA difference for maximum efficiency and zero pitch: {speed_plane.pitch_criteria} [deg]')
+print(f'Pitch moment slope is negative acros the whole range of AoA: {speed_plane.pitch_slope_check}')
+print(f'Zero pitch is at AoA: {speed_plane.zero_aoa_pitch} [deg]')
+
+
 
 post = PostPro()
 post.add_plane(endurance_plane.aero_data,label=endurance_plane.name)
 post.add_plane(plane_data=speed_plane.aero_data,label=speed_plane.name)
-de
+
 post.plot_results()
 
 endurance_plane.draw_airplane()
-'''
