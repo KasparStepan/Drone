@@ -63,13 +63,13 @@ print(f"Parameters evaluated for: {endurance_plane.name}")
 print(f'Maximum efficiency of airplane is at AoA: {endurance_plane.max_efficiency_AoA} deg')
 print(f'AoA difference for maximum efficiency and zero pitch: {endurance_plane.pitch_criteria} [deg]')
 print(f'Pitch moment slope is negative acros the whole range of AoA: {endurance_plane.pitch_slope_check}')
-print(f'Zero pitch is at AoA: {endurance_plane.zero_aoa_pitch} [deg]')
+print(f'Zero pitch is at AoA: {endurance_plane.zero_pitch_aoa} [deg]')
 
 print(f"Parameters evaluated for: {speed_plane.name}")
 print(f'Maximum efficiency of airplane is at AoA: {speed_plane.max_efficiency_AoA} deg')
 print(f'AoA difference for maximum efficiency and zero pitch: {speed_plane.pitch_criteria} [deg]')
 print(f'Pitch moment slope is negative acros the whole range of AoA: {speed_plane.pitch_slope_check}')
-print(f'Zero pitch is at AoA: {speed_plane.zero_aoa_pitch} [deg]')
+print(f'Zero pitch is at AoA: {speed_plane.zero_pitch_aoa} [deg]')
 
 
 

@@ -341,7 +341,7 @@ class Airplane():
 
                 for i in range(len(self.aero_data['Cm'])-1):
                         if (self.aero_data['Cm'][i]*self.aero_data['Cm'][i+1]) < 0:
-                                self.zero_pitch_aoa = self.aero_data['alpha'][i] + self.aero_data['Cm'][i]*(self.aero_data['alpha'][i+1]-self.aero_data['alpha'][i])/(self.aero_data['Cm'][i]-self.aero_data['Cm'][i+1])
+                                self.zero_pitch_aoa = self.aero_data['Cm'][i]*(self.aero_data['alpha'][i]-self.aero_data['alpha'][i+1])/(self.aero_data['Cm'][i+1]-self.aero_data['Cm'][i])+self.aero_data['alpha'][i]
                                 
 
                 self.pitch_criteria = np.abs(self.max_efficiency_AoA-self.zero_pitch_aoa)
