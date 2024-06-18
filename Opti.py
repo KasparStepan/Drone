@@ -78,6 +78,7 @@ class PlaneOpti(ElementwiseProblem):
 
                               g1 = (x[0]+x[1]+wingspan['Main_tip'])-0.75
                               
+                              
 
                               out["F"] = [f1, f2]
                               out["G"] = [g1]
